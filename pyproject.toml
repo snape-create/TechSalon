@@ -1,0 +1,25 @@
+[project]
+name = "techsalon"
+version = "0.1.0"
+description = "this is a TechSalon for our team "
+readme = "README.md"
+authors = [
+    { name = "snape", email = "findnode0031@163.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "django>=5.0,<6.0",
+    "dotenv>=0.9.9",
+    "fastapi>=0.165.0",
+    "fastmcp",
+    "mcp>=1.0,<2",
+    "pytz>=2026.6",
+    "requests>=2.34.2",
+]
+
+[tool.uv.workspace]
+members = [
+    "demoFor_uv",
+]
+
+

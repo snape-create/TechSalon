@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker · uv · MCP — 现代开发者效率三件套</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --bg-soft:#f8fafc;
+    --ink:#1e293b;
+    --ink-soft:#64748b;
+    --line:#e2e8f0;
+    --accent:#2563eb;
+    --accent-soft:#eff6ff;
+    --c-docker:#2563eb;
+    --c-uv:#7c3aed;
+    --c-mcp:#059669;
+    --code-bg:#f1f5f9;
+    --shadow:0 10px 30px rgba(15,23,42,.06);
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --mono:"SF Mono","JetBrains Mono",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--sans);
+    color:var(--ink);
+    background:var(--bg);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- Slide system ---------- */
+  .deck{position:relative;width:100vw;height:100vh}
+  .slide{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;
+    justify-content:center;
+    padding:7vh 9vw 12vh;
+    opacity:0;visibility:hidden;
+    transform:translateY(16px);
+    transition:opacity .38s ease,transform .38s ease,visibility .38s;
+  }
+  .slide.active{opacity:1;visibility:visible;transform:translateY(0)}
+  .slide.cover{background:linear-gradient(135deg,#ffffff 0%,#f8fafc 100%)}
+
+  /* ---------- Typography ---------- */
+  h1{font-size:clamp(2.4rem,6vw,4.6rem);line-height:1.1;letter-spacing:-.02em;font-weight:800}
+  h2{font-size:clamp(1.8rem,4.2vw,3rem);line-height:1.2;letter-spacing:-.01em;font-weight:750;margin-bottom:.4em}
+  h3{font-size:clamp(1.05rem,2vw,1.4rem);font-weight:700;margin-bottom:.5em}
+  p{font-size:clamp(1rem,1.7vw,1.3rem);line-height:1.7;color:var(--ink-soft)}
+  .lead{font-size:clamp(1.1rem,2.2vw,1.6rem);color:var(--ink-soft);margin-top:1em;line-height:1.6}
+  strong{color:var(--ink);font-weight:700}
+  em{font-style:normal;color:var(--accent);font-weight:600}
+
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:.5em;
+    font-size:clamp(.75rem,1.3vw,.95rem);font-weight:700;
+    letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin-bottom:1em;
+  }
+  .eyebrow::before{content:"";width:24px;height:3px;background:currentColor;border-radius:2px}
+
+  /* ---------- Chapter accent colors ---------- */
+  [data-chapter="docker"]{--accent:var(--c-docker);--accent-soft:#eff6ff}
+  [data-chapter="uv"]{--accent:var(--c-uv);--accent-soft:#f5f3ff}
+  [data-chapter="mcp"]{--accent:var(--c-mcp);--accent-soft:#ecfdf5}
+
+  /* ---------- Cover ---------- */
+  .cover .tags{display:flex;gap:.7em;margin-top:2.2em;flex-wrap:wrap}
+  .tag{
+    padding:.55em 1.1em;border:1px solid var(--line);border-radius:999px;
+    font-size:clamp(.85rem,1.5vw,1.05rem);font-weight:600;background:#fff;
+  }
+  .tag.d{color:var(--c-docker);border-color:#bfdbfe}
+  .tag.u{color:var(--c-uv);border-color:#ddd6fe}
+  .tag.m{color:var(--c-mcp);border-color:#a7f3d0}
+  .cover .meta{margin-top:3em;color:var(--ink-soft);font-size:clamp(.85rem,1.4vw,1.05rem)}
+
+  /* ---------- Chapters menu ---------- */
+  .menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2em;margin-top:2em}
+  .menu-card{
+    text-align:left;cursor:pointer;border:1px solid var(--line);border-radius:18px;
+    padding:1.8em;background:#fff;box-shadow:var(--shadow);
+    transition:transform .2s ease,box-shadow .2s ease,border-color .2s;
+    font-family:inherit;color:inherit;
+  }
+  .menu-card:hover{transform:translateY(-5px);box-shadow:0 18px 40px rgba(15,23,42,.10)}
+  .menu-card .num{font-size:2.4rem;font-weight:800;line-height:1}
+  .menu-card .ttl{font-size:1.25rem;font-weight:750;margin:.5em 0 .3em}
+  .menu-card .desc{font-size:.92rem;color:var(--ink-soft);line-height:1.5}
+  .menu-card.d .num{color:var(--c-docker)}
+  .menu-card.u .num{color:var(--c-uv)}
+  .menu-card.m .num{color:var(--c-mcp)}
+
+  /* ---------- Chapter divider ---------- */
+  .divider{min-height:100vh}
+  .divider .big-num{
+    font-size:clamp(7rem,20vw,16rem);font-weight:800;line-height:.8;
+    color:var(--accent);opacity:.10;position:absolute;right:6vw;top:50%;transform:translateY(-50%);
+  }
+  .divider h1{font-size:clamp(3rem,8vw,6rem)}
+  .divider .sub{font-size:clamp(1.1rem,2.4vw,1.8rem);color:var(--ink-soft);margin-top:.8em;max-width:46ch}
+
+  /* ---------- Content building blocks ---------- */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:2.5em;align-items:start;margin-top:1.6em}
+  .cols-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2em;margin-top:1.6em}
+  .card{
+    border:1px solid var(--line);border-radius:16px;padding:1.5em 1.6em;
+    background:var(--bg-soft);
+  }
+  .card h3{display:flex;align-items:center;gap:.55em}
+  .card .ic{
+    width:34px;height:34px;flex:0 0 34px;border-radius:9px;
+    display:grid;place-items:center;font-size:1.1rem;font-weight:800;color:#fff;background:var(--accent);
+  }
+  .card p{font-size:clamp(.9rem,1.4vw,1.08rem)}
+  .bullet-list{list-style:none;margin-top:1.2em;display:grid;gap:.85em}
+  .bullet-list li{
+    position:relative;padding-left:1.7em;font-size:clamp(1rem,1.7vw,1.25rem);line-height:1.55;color:var(--ink);
+  }
+  .bullet-list li::before{
+    content:"";position:absolute;left:0;top:.6em;width:9px;height:9px;border-radius:50%;background:var(--accent);
+  }
+  .note{
+    margin-top:1.4em;padding:1em 1.3em;border-left:4px solid var(--accent);
+    background:var(--accent-soft);border-radius:0 10px 10px 0;
+    font-size:clamp(.92rem,1.5vw,1.12rem);color:var(--ink);line-height:1.6;
+  }
+  .note b{color:var(--accent)}
+
+  /* ---------- Code ---------- */
+  .code{
+    background:var(--code-bg);border:1px solid var(--line);border-radius:14px;
+    padding:1.3em 1.5em;margin-top:1.2em;overflow:auto;
+    font-family:var(--mono);font-size:clamp(.82rem,1.25vw,1.02rem);line-height:1.65;color:#334155;
+  }
+  .code .cm{color:#94a3b8}
+  .code .kw{color:#7c3aed;font-weight:600}
+  .code .st{color:#059669}
+  .code .fn{color:#2563eb}
+  .code .px{color:#94a3b8;user-select:none}
+  .code-label{
+    display:inline-block;font-family:var(--mono);font-size:.78rem;font-weight:700;
+    color:var(--accent);background:var(--accent-soft);padding:.25em .7em;border-radius:6px;margin-bottom:.4em;
+  }
+
+  /* ---------- Table ---------- */
+  table{width:100%;border-collapse:collapse;margin-top:1.4em;font-size:clamp(.9rem,1.4vw,1.1rem)}
+  th,td{text-align:left;padding:.75em 1em;border-bottom:1px solid var(--line)}
+  th{font-weight:700;color:var(--ink);background:var(--bg-soft)}
+  td{color:var(--ink-soft)}
+  td:first-child{font-weight:650;color:var(--ink)}
+  .yes{color:#059669;font-weight:700}
+  .no{color:#cbd5e1}
+
+  /* ---------- Big metrics ---------- */
+  .metrics{display:flex;gap:1.2em;margin-top:1.8em;flex-wrap:wrap}
+  .metric{
+    flex:1;min-width:150px;border:1px solid var(--line);border-radius:16px;
+    padding:1.4em;text-align:center;background:#fff;box-shadow:var(--shadow);
+  }
+  .metric .v{font-size:clamp(1.8rem,3.5vw,2.8rem);font-weight:800;color:var(--accent);line-height:1}
+  .metric .k{font-size:.9rem;color:var(--ink-soft);margin-top:.5em}
+
+  /* ---------- Flow / architecture ---------- */
+  .flow{display:flex;align-items:center;gap:.8em;margin-top:2em;flex-wrap:wrap;justify-content:center}
+  .flow .node{
+    border:1px solid var(--line);border-radius:14px;padding:1.1em 1.4em;
+    background:#fff;box-shadow:var(--shadow);text-align:center;min-width:130px;
+  }
+  .flow .node .t{font-weight:750;font-size:1.05rem}
+  .flow .node .s{font-size:.82rem;color:var(--ink-soft);margin-top:.3em}
+  .flow .node.hl{border-color:var(--accent);background:var(--accent-soft)}
+  .flow .arr{font-size:1.6rem;color:var(--accent);font-weight:700}
+
+  /* ---------- Chrome: progress, page, nav ---------- */
+  .progress-top{position:fixed;top:0;left:0;height:4px;background:var(--accent);z-index:50;transition:width .38s ease,background .38s}
+  .chapter-tag{
+    position:fixed;top:22px;right:34px;font-size:.82rem;font-weight:700;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--accent);z-index:40;
+  }
+  .footer{
+    position:fixed;left:0;right:0;bottom:0;height:64px;z-index:40;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 34px;color:var(--ink-soft);font-size:.85rem;
+  }
+  .footer .hint{opacity:.7}
+  .nav{display:flex;align-items:center;gap:14px}
+  .nav button{
+    width:42px;height:42px;border-radius:50%;border:1px solid var(--line);
+    background:#fff;color:var(--ink);cursor:pointer;font-size:1.1rem;
+    display:grid;place-items:center;transition:all .18s;box-shadow:var(--shadow);
+  }
+  .nav button:hover{border-color:var(--accent);color:var(--accent);transform:scale(1.06)}
+  .nav button:disabled{opacity:.3;cursor:default;transform:none}
+  .page-num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink);min-width:70px;text-align:center}
+  .page-num .cur{color:var(--accent);font-size:1.05em}
+
+  /* ---------- helpers ---------- */
+  .center{text-align:center}
+  .mt1{margin-top:1em}.mt2{margin-top:2em}
+  .emoji{font-style:normal}
+  .end h1{font-size:clamp(2.8rem,7vw,5rem)}
+  .end .box{margin-top:2em;border:1px solid var(--line);border-radius:18px;padding:2em;background:var(--bg-soft);box-shadow:var(--shadow)}
+  .end .combo{display:flex;gap:1em;flex-wrap:wrap;justify-content:center;margin-top:1.5em}
+  .end .combo span{padding:.7em 1.2em;border-radius:12px;font-weight:700;background:#fff;border:1px solid var(--line)}
+
+  /* ---------- Speaker notes ---------- */
+  .notes-panel{
+    position:fixed;left:0;right:0;bottom:64px;z-index:45;
+    max-height:44vh;overflow:auto;
+    background:rgba(255,255,255,.97);
+    border-top:1px solid var(--line);
+    box-shadow:0 -10px 34px rgba(15,23,42,.10);
+    padding:1.1em 9vw 1.3em;
+    opacity:0;visibility:hidden;transform:translateY(16px);
+    transition:opacity .25s,transform .25s,visibility .25s;
+    pointer-events:none;
+  }
+  body.show-notes .notes-panel{opacity:1;visibility:visible;transform:translateY(0);pointer-events:auto}
+  .notes-panel-head{
+    display:flex;align-items:center;justify-content:space-between;
+    font-size:.85rem;font-weight:700;color:var(--accent);margin-bottom:.65em;
+  }
+  .notes-panel-head button{
+    border:none;background:var(--bg-soft);color:var(--ink-soft);
+    width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:1.1rem;line-height:1;
+  }
+  .notes-body{font-size:clamp(.92rem,1.4vw,1.1rem);line-height:1.7;color:var(--ink)}
+  .notes-body ul{margin:.4em 0 .4em 1.25em}
+  .notes-body li{margin:.35em 0}
+  .notes-body b{color:var(--accent)}
+  .nav .pill-btn{width:auto;height:42px;padding:0 14px;border-radius:21px;font-size:.85rem;font-weight:650}
+  .nav .pill-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  @media(max-width:760px){
+    .cols,.cols-3,.menu-grid{grid-template-columns:1fr}
+    .slide{padding:9vh 7vw 12vh}
+    .footer .hint{display:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-top" id="progress"></div>
+<div class="chapter-tag" id="chapterTag"></div>
+
+<div class="deck" id="deck">
+
+  <!-- 1 · Cover -->
+  <section class="slide cover active" data-chapter="intro" data-label="开场">
+    <span class="eyebrow">Tech Salon · 技术沙龙分享</span>
+    <h1>Docker · uv · MCP</h1>
+    <div class="lead">现代开发者的<strong>效率三件套</strong>——从环境隔离到依赖管理，再到让 AI 连接真实世界。</div>
+    <div class="tags">
+      <span class="tag d">📦 容器化</span>
+      <span class="tag u">⚡ Python 工具链</span>
+      <span class="tag m">🔌 AI 协议</span>
+    </div>
+    <div class="meta">按 <strong>→ / 空格</strong> 翻页　·　按 <strong>N</strong> 看备注　·　共 <span id="coverTotal">–</span> 页　·　分享人：________</div>
+  </section>
+
+  <!-- 2 · Agenda -->
+  <section class="slide" data-chapter="intro" data-label="目录">
+    <span class="eyebrow">Agenda</span>
+    <h2>一条主线，三道坎</h2>
+    <p>把一个 AI 小应用从「在我机器上能跑」做到「别人也能跑、还能让 AI 自己查数据」，中间要跨过三道坎：</p>
+    <div class="menu-grid">
+      <button class="menu-card d" data-goto="3">
+        <div class="num">01</div>
+        <div class="ttl">Docker · 固环境</div>
+        <div class="desc">第一道坎：环境不一致。把运行环境固化成镜像，搬到哪都能跑。</div>
+      </button>
+      <button class="menu-card u" data-goto="16">
+        <div class="num">02</div>
+        <div class="ttl">uv · 管依赖</div>
+        <div class="desc">第二道坎：装包慢、环境乱。极速装包并锁定版本，一键复现。</div>
+      </button>
+      <button class="menu-card m" data-goto="21">
+        <div class="num">03</div>
+        <div class="ttl">MCP · 连世界</div>
+        <div class="desc">第三道坎：AI 够不到数据。用统一协议调用工具与实时信息。</div>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ DOCKER ============ -->
+  <!-- 3 · Divider -->
+  <section class="slide divider" data-chapter="docker" data-label="Docker">
+    <div class="big-num">01</div>
+    <span class="eyebrow">Part One</span>
+    <h1>Docker 容器</h1>
+    <div class="sub">第一道坎 · 环境：把应用和它的运行环境打包成标准箱子，搬到哪都能跑。</div>
+  </section>
+
+  <!-- 4 · What is container -->
+  <section class="slide" data-chapter="docker" data-label="Docker">
+    <span class="eyebrow">是什么</span>
+    <h2>容器 = 软件界的集装箱</h2>
+    <p>传统部署像散装货物，环境靠人肉搬运；容器把代码 + 运行时 + 依赖 + 配置打包成<strong>标准化交付单元</strong>，交付过程标准化。</p>
+    <div class="cols">
+      <div class="card">
+        <h3><span class="ic">🚢</span> 集装箱类比</h3>
+        <p>货物不管里面装什么，集装箱尺寸统一，船、卡车、起重机都能处理。容器也一样：不管里面是 Node 还是 Python，Docker 引擎统一运行。</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">⚙️</span> 技术本质</h3>
+        <p>容器是<strong>进程级隔离</strong>，共享宿主机内核，但拥有自己的文件系统、网络和进程空间。比虚拟机轻得多——秒级启动，MB 级体积。</p>
+      </div>
+    </div>
+    <div class="note"><b>关键点：</b>容器不是迷你虚拟机。它不启动完整操作系统，所以快、小、密度高。</div>
+  </section>
+
+  <!-- 5 · Why docker -->
+  <section class="slide" data-chapter="docker" data-label="Docker">
+    <span class="eyebrow">为什么用</span>
+    <h2>它到底解决了什么痛点</h2>
+    <div class="cols-3">
+      <div class="card">
+        <h3><span class="ic">✓</span> 环境一致</h3>
+        <p>"在我机器上能跑"成为历史。开发、测试、生产用同一个镜像，杜绝环境差异导致的诡异 Bug。</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">⚡</span> 快速弹性</h3>
+        <p>秒级启动与停止，配合编排工具可轻松水平扩容，资源利用率远高于虚拟机。</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">📦</span> 可移植</h3>
+        <p>一次构建，推到任意 Registry，在任意装有 Docker 的机器上运行——笔记本、服务器、云。</p>
+      </div>
+    </div>
+    <div class="note"><b>一句话：</b>Docker 把"环境"变成了可版本化、可分发的<strong>代码</strong>。</div>
+  </section>
+
+  <!-- 6 · Core concepts -->
+  <section class="slide" data-chapter="docker" data-label="Docker">
+    <span class="eyebrow">核心概念</span>
+    <h2>三个词，理解 Docker</h2>
+    <div class="cols-3">
+      <div class="card">
+        <h3><span class="ic">▤</span> Image 镜像</h3>
+        <p>只读的模板，包含运行应用所需的一切。分层存储，可复用。类似面向对象里的"类"。</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">▶</span> Container 容器</h3>
+        <p>镜像运行起来的实例，有独立的可写层。类似"对象"。同一个镜像可以跑出多个容器。</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">📝</span> Dockerfile</h3>
+        <p>用代码描述如何构建镜像的脚本。配合 <em>docker build</em> 生成镜像，让构建过程可复现。</p>
+      </div>
+    </div>
+    <div class="flow">
+      <div class="node"><div class="t">Dockerfile</div><div class="s">构建脚本</div></div>
+      <div class="arr">→</div>
+      <div class="node hl"><div class="t">Image</div><div class="s">只读模板</div></div>
+      <div class="arr">→</div>
+      <div class="node"><div class="t">Container</div><div class="s">运行实例</div></div>
+    </div>
+  </section>
+
+  <!-- NEW · 镜像分层 -->
+  <section class="slide" data-chapter="docker" data-label="Docker">
+    <span class="eyebrow">深入 · 镜像</span>
+    <h2>镜像不是一个文件，而是一叠层</h2>
+    <p>镜像的分层存储基于 <strong>UnionFS</strong>：每一层只记录相对上一层的改动，最终联合挂载成一个文件系统。它更像一个<strong>虚拟概念</strong>，而非 ISO 那样的单个打包文件。</p>
+    <div class="cols">
+      <div class="card">
+        <h3><span class="ic">▤</span> 分层存储</h3>
+        <p>Dockerfile 每一行都会新建一层。层一旦构建完成就不再改变，后一层对文件的增、删、改都只发生在自己这一层——删除文件也只是"遮盖"，不会真的缩小体积。</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">▶</span> 容器 = 镜像 + 可写层</h3>
+        <p>镜像像"类"，容器像"实例"。容器运行时在镜像之上叠加一层可读写的<strong>容器存储层</strong>，对环境的修改只作用于这一层，不会污染镜像。</p>
+      </div>
+    </div>
+    <div class="note"><b>易失性：</b>容器存储层的生命周期与容器一致——容器删除，其中的数据随之消失。要持久化，得用<b>数据卷</b>或<b>绑定宿主目录</b>（后面讲）。</div>
+  </section>
+
+  <!-- NEW · 仓库与命名 -->
+  <section class="slide" data-chapter="docker" data-label="Docker">
+    <span class="eyebrow">深入 · 分发</span>
+    <h2>仓库、Tag 与镜像的"全名"</h2>
+    <p>Docker 用 <strong>Registry</strong> 存储和分发镜像：一个 Registry 下有多个<strong>仓库（Repository）</strong>，每个仓库用<strong>标签（Tag）</strong>区分不同版本的镜像。</p>
+    <div class="code"><span class="code-label">镜像命名规则</span>
+ubuntu                          <span class="cm"># 等价于 ubuntu:latest（未指定标签默认 latest）</span>
+ubuntu:24.04                    <span class="cm"># 官方仓库 ubuntu 的 24.04 版本</span>
+yyy/ubuntu:22.04                <span class="cm"># 用户 yyy 在 Docker Hub 的 ubuntu 镜像 22.04</span>
+reg.example.com/team/app:v1     <span class="cm"># 私有 Registry 上的镜像</span></div>
+    <div class="note"><b>规律：</b>完整名字是 <b>[registry/][用户/]镜像名:标签</b>。省略用户名指向<b>官方镜像</b>，省略标签默认 <b>latest</b>。所谓"换源"换的就是默认 Registry（Docker Hub）的地址。</div>
+  </section>
+
+  <!-- NEW · docker run 背后 -->
+  <section class="slide" data-chapter="docker" data-label="Docker">
+    <span class="eyebrow">深入 · 命令</span>
+    <h2>一条 docker run，背后做了四件事</h2>
+    <p>看似简单的一条命令，其实串起了"找镜像 → 建容器 → 执行命令 → 终止容器"的完整流程：</p>
+    <div class="cols-3">
+      <div class="card"><h3><span class="ic">1</span> 找镜像</h3><p>先查本地；没有就去 Registry（默认 Docker Hub）拉取到本机。</p></div>
+      <div class="card"><h3><span class="ic">2</span> 建容器</h3><p>用准备好的镜像创建一个新容器并启动。</p></div>
+      <div class="card"><h3><span class="ic">3</span> 执行命令</h3><p>运行你给的 command；没给就跑镜像里 CMD 指定的默认命令。</p></div>
+    </div>
+    <div class="note"><b>4 · 终止但不删除：</b>命令执行完容器就<strong>停止</strong>了，但<strong>还在</strong>（<b>docker ps -a</b> 能看到）。加 <b>--rm</b> 才会跑完自动删。常用临时环境：<b>docker run --rm -it ubuntu</b>。</div>
+  </section>
+
+  <!-- 7 · Common commands -->
+  <section class="slide" data-chapter="docker" data-label="Docker 实操">
+    <span class="eyebrow">实操 · 命令</span>
+    <h2>高频命令，照抄即用</h2>
+    <div class="code"><span class="code-label">终端</span>
+<span class="px">$</span> docker pull nginx                       <span class="cm"># 拉取镜像</span>
+<span class="px">$</span> docker run -d -p 8080:80 --name web nginx <span class="cm"># 后台运行并映射端口</span>
+<span class="px">$</span> docker ps                              <span class="cm"># 查看运行中的容器</span>
+<span class="px">$</span> docker logs -f web                     <span class="cm"># 实时看日志</span>
+<span class="px">$</span> docker exec -it web sh                 <span class="cm"># 进入容器内部</span>
+<span class="px">$</span> docker stop web &amp;&amp; docker rm web <span class="cm"># 停止并删除</span>
+<span class="px">$</span> docker build -t myapp:1.0 .            <span class="cm"># 用 Dockerfile 构建镜像</span></div>
+    <div class="note"><b>-d</b> 后台运行　<b>-p 宿主:容器</b> 端口映射　<b>-it</b> 交互式终端　<b>--name</b> 起个名方便管理。</div>
+  </section>
+
+  <!-- 8 · Dockerfile -->
+  <section class="slide" data-chapter="docker" data-label="Docker 实操">
+    <span class="eyebrow">实操 · Dockerfile</span>
+    <h2>一个 Web 应用的典型构建</h2>
+    <div class="code"><span class="code-label">Dockerfile</span>
+<span class="kw">FROM</span> node:20-alpine          <span class="cm"># 基础镜像，alpine 体积小</span>
+<span class="kw">WORKDIR</span> /app                <span class="cm"># 设定工作目录</span>
+<span class="kw">COPY</span> package*.json ./       <span class="cm"># 先拷贝依赖清单</span>
+<span class="kw">RUN</span> npm ci --omit=dev       <span class="cm"># 安装生产依赖</span>
+<span class="kw">COPY</span> . .                    <span class="cm"># 再拷贝源码（利用缓存）</span>
+<span class="kw">EXPOSE</span> 3000                 <span class="cm"># 声明监听端口</span>
+<span class="kw">CMD</span> [<span class="st">"node"</span>, <span class="st">"index.js"</span>]      <span class="cm"># 容器启动命令</span></div>
+    <div class="note"><b>分层缓存技巧：</b>先 COPY 依赖清单再装依赖，源码改动时依赖层可复用，构建快很多。再加一个 <b>.dockerignore</b> 忽略 node_modules。</div>
+  </section>
+
+  <!-- NEW · 构建上下文 -->
+  <section class="slide" data-chapter="docker" data-label="Docker 实操">
+    <span class="eyebrow">深入 · build</span>
+    <h2>命令末尾那个 "." 到底是什么</h2>
+    <p>很多人以为 <em>.</em> 是 Dockerfile 所在目录——不对。Dockerfile 由 <em>-f</em> 指定，而末尾这个路径是<strong>构建上下文</strong>。</p>
+    <div class="code"><span class="px">$</span> docker build -f path/to/Dockerfile -t test:1.0 .</div>
+    <div class="cols">
+      <div class="card">
+        <h3><span class="ic">📦</span> 上下文会整体上传</h3>
+        <p>build 时，客户端把上下文目录下的<strong>所有内容打包</strong>发给 Docker Engine，引擎展开后才知道 COPY 要复制什么。所以 COPY 的源路径是<strong>相对于上下文</strong>的。</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">⛔</span> 超出上下文就拿不到</h3>
+        <p><b>COPY ../a .</b> 用了父目录文件、<b>COPY /usr/x .</b> 用了绝对路径——两者都超出上下文范围，构建必然失败。这也是为什么要配 <b>.dockerignore</b> 减小上传体积。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- NEW · 多阶段构建 -->
+  <section class="slide" data-chapter="docker" data-label="Docker 实操">
+    <span class="eyebrow">进阶 · 瘦身</span>
+    <h2>多阶段构建：只把成品带走</h2>
+    <p>编译完成后，源码和编译工具就成了累赘。多阶段构建让你在一个阶段编译，在另一个阶段<strong>只 COPY 成品</strong>，最终镜像不含依赖和源码。</p>
+    <div class="code"><span class="code-label">Dockerfile</span>
+<span class="kw">FROM</span> ubuntu <span class="kw">AS</span> builder
+<span class="kw">WORKDIR</span> /usr/src/cpp
+<span class="kw">RUN</span> apt update &amp;&amp; apt install -y build-essential
+<span class="kw">COPY</span> main.cpp .
+<span class="kw">RUN</span> g++ main.cpp -o main -static
+
+<span class="kw">FROM</span> scratch
+<span class="kw">COPY</span> --from=builder /usr/src/cpp/main .
+<span class="kw">CMD</span> [<span class="st">"./main"</span>]</div>
+    <div class="note"><b>关键词：</b><b>AS</b> 给阶段起名，<b>COPY --from=builder</b> 从上一阶段取文件（路径是<b>镜像内</b>的，不是宿主机的）。<b>scratch</b> 是空镜像；配合 <b>-static</b> 静态链接，最终镜像可小到 <b>2.25 MB</b>。</div>
+  </section>
+
+  <!-- NEW · 数据卷 -->
+  <section class="slide" data-chapter="docker" data-label="Docker 实操">
+    <span class="eyebrow">进阶 · 持久化</span>
+    <h2>容器会消失，数据不能</h2>
+    <p><strong>数据卷</strong>是绕过联合文件系统的特殊目录：可在容器间共享、修改立即生效、更新不影响镜像，且<strong>不会随容器删除而消失</strong>。</p>
+    <div class="code"><span class="px">$</span> docker volume create db            <span class="cm"># 创建数据卷</span>
+<span class="px">$</span> docker volume ls                   <span class="cm"># 列出所有数据卷</span>
+<span class="px">$</span> docker run -d --name web \
+    --mount source=db,target=/app/data backend
+<span class="px">$</span> docker inspect web                 <span class="cm"># 看 Mounts 字段确认挂载</span></div>
+    <div class="note"><b>另一种方式：绑定宿主目录</b>——<b>--mount type=bind,source=/abs/path,target=/app/data,readonly</b>。本地路径必须用<b>绝对路径</b>；加 readonly 则容器内只读。两者都能让数据在容器重建后依然存在。</div>
+  </section>
+
+  <!-- 9 · Compose -->
+  <section class="slide" data-chapter="docker" data-label="Docker 实操">
+    <span class="eyebrow">实操 · Compose</span>
+    <h2>多容器编排：docker compose</h2>
+    <p>一个 YAML 文件定义多个服务，一条命令拉起整个应用栈。</p>
+    <div class="code"><span class="code-label">compose.yaml</span>
+<span class="kw">services</span>:
+  <span class="fn">web</span>:
+    <span class="fn">build</span>: .
+    <span class="fn">ports</span>: [<span class="st">"3000:3000"</span>]
+    <span class="fn">depends_on</span>: [db]
+  <span class="fn">db</span>:
+    <span class="fn">image</span>: postgres:16
+    <span class="fn">environment</span>:
+      POSTGRES_PASSWORD: example</div>
+    <div class="code"><span class="px">$</span> docker compose up -d      <span class="cm"># 一键启动所有服务</span>
+<span class="px">$</span> docker compose down       <span class="cm"># 一键停止并清理</span></div>
+  </section>
+
+  <!-- ============ UV ============ -->
+  <!-- 10 · Divider -->
+  <section class="slide divider" data-chapter="uv" data-label="uv">
+    <div class="big-num">02</div>
+    <span class="eyebrow">Part Two</span>
+    <h1>uv</h1>
+    <div class="sub">第二道坎 · 依赖：一个工具替换 pip / virtualenv / poetry 的大半工作，而且快得离谱。</div>
+  </section>
+
+  <!-- 11 · What is uv -->
+  <section class="slide" data-chapter="uv" data-label="uv">
+    <span class="eyebrow">是什么</span>
+    <h2>uv：Rust 打造的 Python 工具链</h2>
+    <p>由 <strong>Astral</strong>（Ruff 的团队）用 Rust 编写。它既是包管理器，也是项目管理工具，目标是把 Python 生态里零散的工具统一起来。</p>
+    <div class="metrics">
+      <div class="metric"><div class="v">10–100×</div><div class="k">比 pip 安装更快</div></div>
+      <div class="metric"><div class="v">Rust</div><div class="k">底层实现语言</div></div>
+      <div class="metric"><div class="v">All-in-one</div><div class="k">安装 / 锁版本 / 建环境 / 管 Python</div></div>
+    </div>
+    <div class="note"><b>为什么这么快：</b>Rust 编译型性能 + 并行下载 + 全局内容寻址缓存 + 高效的依赖解析。同一依赖只下载一次，多个项目共享。</div>
+  </section>
+
+  <!-- 12 · Comparison -->
+  <section class="slide" data-chapter="uv" data-label="uv">
+    <span class="eyebrow">对比</span>
+    <h2>和老工具比，强在哪</h2>
+    <table>
+      <tr><th>能力</th><th>pip + venv</th><th>Poetry</th><th>uv</th></tr>
+      <tr><td>安装速度</td><td class="no">慢</td><td>中</td><td class="yes">极快</td></tr>
+      <tr><td>依赖锁定</td><td>需 pip-tools</td><td class="yes">✓</td><td class="yes">✓ 内置</td></tr>
+      <tr><td>管理 Python 版本</td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓ 内置</td></tr>
+      <tr><td>单二进制安装</td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td></tr>
+      <tr><td>兼容 pyproject.toml</td><td>部分</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+    </table>
+    <div class="note"><b>定位：</b>uv 不是要"再造一个轮子"，而是把pip 的快、Poetry 的规范、pyenv 的版本管理，用一个极快的二进制整合起来。</div>
+  </section>
+
+  <!-- 13 · uv commands -->
+  <section class="slide" data-chapter="uv" data-label="uv 实操">
+    <span class="eyebrow">实操 · 命令</span>
+    <h2>从零开始的标准工作流</h2>
+    <div class="code"><span class="px">$</span> uv init myproject                <span class="cm"># 新建项目（生成 pyproject.toml）</span>
+<span class="px">$</span> cd myproject
+<span class="px">$</span> uv add requests                  <span class="cm"># 添加依赖，自动建虚拟环境+锁文件</span>
+<span class="px">$</span> uv add --dev pytest             <span class="cm"># 添加开发依赖</span>
+<span class="px">$</span> uv sync                         <span class="cm"># 按锁文件同步环境</span>
+<span class="px">$</span> uv run python main.py           <span class="cm"># 在环境里运行，无需手动激活</span>
+<span class="px">$</span> uv python install 3.12          <span class="cm"># 直接安装指定 Python 版本</span>
+<span class="px">$</span> uv tree                         <span class="cm"># 查看依赖树</span></div>
+    <div class="note"><b>心智负担极低：</b>不用手动 <b>source activate</b>，<b>uv run</b> 自动找到环境。装完依赖自动生成 <b>uv.lock</b> 保证可复现。</div>
+  </section>
+
+  <!-- 14 · pyproject -->
+  <section class="slide" data-chapter="uv" data-label="uv 实操">
+    <span class="eyebrow">实操 · 项目文件</span>
+    <h2>pyproject.toml 长什么样</h2>
+    <div class="code"><span class="code-label">pyproject.toml</span>
+[<span class="fn">project</span>]
+name = <span class="st">"myproject"</span>
+version = <span class="st">"0.1.0"</span>
+requires-python = <span class="st">">=3.11"</span>
+dependencies = [
+    <span class="st">"requests>=2.31"</span>,
+    <span class="st">"pytest>=8.0; extra == 'dev'"</span>,
+]</div>
+    <div class="code"><span class="cm"># 兼容 pip 的用法：直接编译 / 安装 requirements</span>
+<span class="px">$</span> uv pip compile pyproject.toml -o requirements.txt
+<span class="px">$</span> uv pip sync requirements.txt</div>
+    <div class="note"><b>迁移成本低：</b>uv 完全拥抱标准 <b>pyproject.toml</b>，也提供 <b>uv pip</b> 接口兼容 requirements.txt 老工作流。</div>
+  </section>
+
+  <!-- ============ MCP ============ -->
+  <!-- 15 · Divider -->
+  <section class="slide divider" data-chapter="mcp" data-label="MCP">
+    <div class="big-num">03</div>
+    <span class="eyebrow">Part Three</span>
+    <h1>MCP</h1>
+    <div class="sub">第三道坎 · 连接：Model Context Protocol——让 AI 安全、标准地连上外部工具与数据。</div>
+  </section>
+
+  <!-- 16 · What is MCP -->
+  <section class="slide" data-chapter="mcp" data-label="MCP">
+    <span class="eyebrow">是什么</span>
+    <h2>AI 世界的 USB-C</h2>
+    <p>USB-C 统一了设备连接；MCP 统一了 <strong>AI 应用</strong> 与 <strong>外部能力</strong> 的连接方式。它由 Anthropic 于 2024 年开源，是一套开放标准。</p>
+    <div class="cols">
+      <div class="card">
+        <h3><span class="ic">🔌</span> 标准化接口</h3>
+        <p>过去每个 AI 应用要为每个工具单独写适配。MCP 定义统一协议，工具只需实现一次，任何支持 MCP 的客户端都能用。</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">🌐</span> 生态可复用</h3>
+        <p>文件系统、GitHub、数据库、Slack……社区已有大量现成 Server，拿来即用，也能自己写。</p>
+      </div>
+    </div>
+    <div class="note"><b>解决的核心问题：</b>让大模型从"只会聊天"变成能<strong>调用工具、读取实时数据、执行操作</strong>的助手。</div>
+  </section>
+
+  <!-- 17 · Architecture -->
+  <section class="slide" data-chapter="mcp" data-label="MCP">
+    <span class="eyebrow">架构</span>
+    <h2>三方协作，职责清晰</h2>
+    <div class="flow">
+      <div class="node hl"><div class="t">Host</div><div class="s">AI 应用<br>Claude / Cursor</div></div>
+      <div class="arr">⇄</div>
+      <div class="node"><div class="t">Client</div><div class="s">协议客户端<br>1:1 连接 Server</div></div>
+      <div class="arr">⇄</div>
+      <div class="node hl"><div class="t">Server</div><div class="s">能力提供方<br>工具 / 数据 / 模板</div></div>
+    </div>
+    <div class="cols-3 mt2">
+      <div class="card"><h3>🛠️ Tools</h3><p>可被模型调用的函数，如查天气、读文件、发请求。</p></div>
+      <div class="card"><h3>📄 Resources</h3><p>可读取的数据源，如文件、数据库记录、API 响应。</p></div>
+      <div class="card"><h3>💬 Prompts</h3><p>预定义的提示词模板，供用户或模型复用。</p></div>
+    </div>
+    <div class="note"><b>传输方式：</b>本地用 <b>stdio</b>，远程用 <b>Streamable HTTP</b>（HTTP+SSE 已废弃）。通信基于 JSON-RPC 2.0，细节见下页。</div>
+  </section>
+
+  <!-- NEW · Function Calling vs MCP -->
+  <section class="slide" data-chapter="mcp" data-label="MCP">
+    <span class="eyebrow">深入 · 关系</span>
+    <h2>Function Calling 和 MCP，到底是什么关系</h2>
+    <p>这是最容易被讲混的一点。<strong>Function Calling 是模型的能力</strong>，让 LLM 能"提出要调用某个函数"；<strong>MCP 是协议的规范</strong>，规定工具怎么被描述、注册、发现、调用。</p>
+    <div class="cols">
+      <div class="card">
+        <h3><span class="ic">🧠</span> Function Calling（模型侧）</h3>
+        <p>模型根据函数描述，输出结构化调用请求（要调哪个函数、参数是什么）。分两层：模型层学会"何时调"，API 层用 <b>tools</b> 字段把函数描述传给模型。它不负责真正执行。</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">🔌</span> MCP（协议侧）</h3>
+        <p>解决"工具如何被广泛复用"：统一 Server 的注册、工具发现（<b>tools/list</b>）、调用（<b>tools/call</b>）与结果回传格式。任何支持 MCP 的客户端都能直接消费同一个 Server。</p>
+      </div>
+    </div>
+    <div class="note"><b>一句话区分：</b>Function Calling 让模型<b>会提出</b>调用；MCP 让工具<b>能被统一地接进来</b>——前者是能力，后者是标准。基于 MCP 的调用，本质就是"用 MCP 工具描述驱动的 Function Calling"。</div>
+  </section>
+
+  <!-- NEW · 传输方式演进 -->
+  <section class="slide" data-chapter="mcp" data-label="MCP">
+    <span class="eyebrow">深入 · 传输</span>
+    <h2>三种传输方式：一条演进线</h2>
+    <p>传输方式解决的是"client 和 server 怎么说话"。记住演进顺序，就不会被过时资料带偏：</p>
+    <div class="cols-3">
+      <div class="card"><h3><span class="ic">1</span> stdio（本地）</h3><p>标准输入输出 + 管道，按行分隔 JSON-RPC。配置就是一条命令（<b>command + args</b>），本地首选。</p></div>
+      <div class="card"><h3><span class="ic">2</span> HTTP+SSE（已废弃）</h3><p>初代远程方案：POST 发请求 + SSE 通道回消息，需维护两个端点。已被官方标为 deprecated，仅为兼容保留。</p></div>
+      <div class="card"><h3><span class="ic">3</span> Streamable HTTP（现行）</h3><p>单一端点同时支持 POST/GET，SSE 变成按需的流式响应。支持断线续传、会话管理，跨平台更好。</p></div>
+    </div>
+    <div class="note"><b>为什么改：</b>SSE 只能传文本、主要面向浏览器、要维护两个端点；Streamable HTTP 收敛为一个 URL，支持任意 Content-Type 与断线重连。配置形态仍是 <b>{ "url": "https://…/mcp" }</b>。</div>
+  </section>
+
+  <!-- 18 · Config -->
+  <section class="slide" data-chapter="mcp" data-label="MCP 实操">
+    <span class="eyebrow">实操 · 接入现成 Server</span>
+    <h2>5 分钟给 AI 装上能力</h2>
+    <p>在客户端配置里声明 MCP Server，重启即可。以文件系统 Server 为例：</p>
+    <div class="code"><span class="code-label">claude_desktop_config.json</span>
+{
+  <span class="st">"mcpServers"</span>: {
+    <span class="st">"filesystem"</span>: {
+      <span class="st">"command"</span>: <span class="st">"npx"</span>,
+      <span class="st">"args"</span>: [
+        <span class="st">"-y"</span>,
+        <span class="st">"@modelcontextprotocol/server-filesystem"</span>,
+        <span class="st">"/path/to/allowed"</span>
+      ]
+    }
+  }
+}</div>
+    <div class="note"><b>安全提示：</b>Server 的权限由你授予。filesystem Server 只能访问配置里指定的目录——按需授权，最小权限原则。</div>
+  </section>
+
+  <!-- 19 · Write a server -->
+  <section class="slide" data-chapter="mcp" data-label="MCP 实操">
+    <span class="eyebrow">实操 · 手写一个 Server</span>
+    <h2>一个工具，十几行代码</h2>
+    <div class="code"><span class="code-label">server.py（基于 FastMCP）</span>
+<span class="kw">from</span> mcp.server.fastmcp <span class="kw">import</span> FastMCP
+
+mcp = FastMCP(<span class="st">"demo"</span>)
+
+<span class="fn">@mcp.tool()</span>
+<span class="kw">def</span> <span class="fn">add</span>(a: <span class="kw">int</span>, b: <span class="kw">int</span>) -> <span class="kw">int</span>:
+    <span class="st">"""两数相加"""</span>
+    <span class="kw">return</span> a + b
+
+<span class="kw">if</span> __name__ == <span class="st">"__main__"</span>:
+    mcp.run()  <span class="cm"># 默认用 stdio 传输</span></div>
+    <div class="code"><span class="px">$</span> pip install mcp        <span class="cm"># 或用 uv add mcp</span>
+<span class="px">$</span> python server.py       <span class="cm"># 在支持的客户端里配置启动</span></div>
+    <div class="note"><b>只需加装饰器</b> <b>@mcp.tool()</b>，函数的类型注解和 docstring 会自动变成工具的描述。把脚本路径配到客户端的 mcpServers 里即可调用。</div>
+  </section>
+
+  <!-- ============ END ============ -->
+  <!-- 20 · Summary -->
+  <section class="slide end" data-chapter="end" data-label="总结">
+    <span class="eyebrow">Recap</span>
+    <h1>三件套，串起来</h1>
+    <div class="box">
+      <div class="combo">
+        <span style="color:var(--c-docker)">📦 Docker — 固化运行环境</span>
+        <span style="color:var(--c-uv)">⚡ uv — 管好 Python 依赖</span>
+        <span style="color:var(--c-mcp)">🔌 MCP — 连接 AI 与世界</span>
+      </div>
+      <p class="mt2 center">用 Docker 封装一致的运行环境，用 uv 极速管理项目依赖，<br>用 MCP 让你的应用/AI 标准化地调用工具与数据。</p>
+    </div>
+    <div class="center mt2" style="font-size:clamp(1.2rem,2.5vw,1.9rem);font-weight:750">谢谢 · Q & A 🙌</div>
+  </section>
+
+</div>
+
+<div class="notes-panel" id="notesPanel">
+  <div class="notes-panel-head">
+    <span>演讲备注 · 第 <b id="notesPage">1</b> 页</span>
+    <button id="notesClose" aria-label="关闭备注">×</button>
+  </div>
+  <div class="notes-body" id="notesBody"></div>
+</div>
+
+<div class="footer">
+  <div class="hint">← → / 空格 翻页　·　N 备注　·　P 演讲者视图　·　Home / End 首尾</div>
+  <div class="nav">
+    <button id="notesBtn" class="pill-btn" title="显示/隐藏备注 (N)">备注</button>
+    <button id="presenterBtn" class="pill-btn" title="打开演讲者视图 (P)">演讲者视图</button>
+    <button id="prev" aria-label="上一页">‹</button>
+    <div class="page-num"><span class="cur" id="cur">1</span> / <span id="total">1</span></div>
+    <button id="next" aria-label="下一页">›</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const progress = document.getElementById('progress');
+  const chapterTag = document.getElementById('chapterTag');
+  const curEl = document.getElementById('cur');
+  const totalEl = document.getElementById('total');
+  const coverTotal = document.getElementById('coverTotal');
+  const prevBtn = document.getElementById('prev');
+  const nextBtn = document.getElementById('next');
+  const notesBtn = document.getElementById('notesBtn');
+  const presenterBtn = document.getElementById('presenterBtn');
+  const notesPanel = document.getElementById('notesPanel');
+  const notesBody = document.getElementById('notesBody');
+  const notesPage = document.getElementById('notesPage');
+  const notesClose = document.getElementById('notesClose');
+  let i = 0;
+  let presenterWin = null;
+
+  /* 每页的演讲备注：讲什么、强调什么、演示提示、如何过渡。
+     按 N 在屏幕底部显示；按 P 打开独立演讲者视图。 */
+  const NOTES = [
+    // 1 封面
+    `<b>开场</b><ul>
+      <li>自我介绍，说明今天分享三个日常开发立刻能用上的工具。</li>
+      <li>破冰：先问一句"有没有人觉得'在我机器上能跑'这句话很熟？"，用痛点引出 Docker。</li>
+      <li><b>主线要早抛</b>：一个 AI 小应用，从"能跑"到"别人也能跑、还能自己查数据"，要跨环境、依赖、连接三道坎——这三件工具各解决一道。</li>
+      <li><b>时间分配（30–40 分钟）</b>：Docker 10–12 分钟、uv 8–10 分钟、MCP 12–15 分钟；MCP 独家素材最多，多留点时间。</li>
+      <li><b>现场演示克制</b>：每章只现场敲一段，其余用预录/截图，否则时间会失控。</li>
+      <li>鼓励互动：有疑问随时打断，最后留 Q&amp;A。</li>
+    </ul>`,
+    // 2 目录
+    `<b>目录</b><ul>
+      <li><b>这一页是全场的骨架</b>：先把"三道坎"的故事讲清楚，再让大家看目录卡片，<b>不要展开</b>具体技术。</li>
+      <li>反复强调主线：Docker 固环境 → uv 管依赖 → MCP 连世界，三个工具各管一段、互相补位。</li>
+      <li>如果现场用电脑控制，可点目录卡片直接跳到对应章节。</li>
+    </ul>`,
+    // 3 Docker 分隔页
+    `<b>过渡 · 第一道坎</b><ul>
+      <li>回扣主线：<b>第一道坎是环境</b>——先把应用和它的运行环境一起固化，才谈得上后面的依赖和 AI。</li>
+      <li>可以问："谁被环境不一致坑过？"等听众举手/点头再继续。</li>
+    </ul>`,
+    // 4 什么是容器
+    `<b>是什么</b><ul>
+      <li>展开集装箱类比：过去软件交付像散装货，容器把它标准化了。</li>
+      <li>关键句：<b>进程级隔离、共享宿主机内核</b>——这是"为什么比虚拟机快"的根本原因。</li>
+      <li>有人问安全性时：隔离性弱于 VM，但日常开发与应用隔离足够。</li>
+      <li>过渡：理解了本质，看它具体解决哪些痛点。</li>
+    </ul>`,
+    // 5 为什么用 Docker
+    `<b>为什么用</b><ul>
+      <li>三个点各配一个真实场景：环境不一致导致上线翻车；秒级扩容；换机器不用重装环境。</li>
+      <li>金句收尾：<b>把"环境"变成可版本化、可分发的代码</b>。</li>
+      <li>过渡：价值清楚了，看三个核心概念。</li>
+    </ul>`,
+    // 6 核心概念
+    `<b>核心概念</b><ul>
+      <li>用"类 vs 对象"类比 Image 与 Container，工程师听众秒懂。</li>
+      <li>强调 Image <b>只读</b>、Container 有<b>可写层</b>；一个镜像可跑多个容器。</li>
+      <li>沿流程图讲一遍：Dockerfile → build → Image → run → Container。</li>
+      <li>过渡：概念到位，再往深一层看镜像的本质。</li>
+    </ul>`,
+    // NEW 镜像分层
+    `<b>深入：镜像分层</b><ul>
+      <li>用"一叠透明胶片"比喻 UnionFS：每层只记改动，叠起来才是完整文件系统。</li>
+      <li>强调<b>镜像是只读、静态的</b>；在容器里装包、改配置都不会改写镜像。</li>
+      <li>点出删除文件只是"遮盖"，所以分层里删大文件并不能减小体积——引出后面的多阶段构建。</li>
+      <li>过渡：镜像怎么被别人拿到？聊聊仓库和命名。</li>
+    </ul>`,
+    // NEW 仓库与命名
+    `<b>深入：仓库与命名</b><ul>
+      <li>讲清 Registry → Repository → Tag 的包含关系。</li>
+      <li>现场拆解 <b>yyy/ubuntu:22.04</b>：用户/镜像名:版本；省略用户名即官方镜像，省略标签即 latest。</li>
+      <li>提一句"换源"本质是改默认的 Registry（Docker Hub）地址。</li>
+      <li>过渡：名字清楚了，回头细看最常用的 run 命令到底干了什么。</li>
+    </ul>`,
+    // NEW docker run 背后
+    `<b>深入：docker run</b><ul>
+      <li>按 4 步讲：找镜像（本地→远程）→ 建容器 → 执行命令 → 终止容器。</li>
+      <li>强调"终止 ≠ 删除"：<b>docker ps -a</b> 还能看到，加 --rm 才自动删。</li>
+      <li>演示 <b>docker run --rm -it ubuntu</b>：临时模拟 Ubuntu 环境，exit 即走。</li>
+      <li>过渡：原理清楚了，看高频命令速查。</li>
+    </ul>`,
+    // 7 高频命令
+    `<b>演示：高频命令</b><ul>
+      <li>现场敲一遍 <b>docker run -d -p 8080:80 nginx</b>，浏览器打开 localhost:8080 验证。</li>
+      <li>提醒 <b>-p 宿主:容器</b> 的顺序最容易记反。</li>
+      <li>exec -it 进去后 exit 退出<b>不会</b>停止容器，用 stop 才是停。</li>
+      <li>过渡：run 现成镜像只是第一步，怎么造自己的镜像？</li>
+    </ul>`,
+    // 8 Dockerfile
+    `<b>演示：Dockerfile</b><ul>
+      <li>逐行讲，重点解释分层缓存：<b>为什么先 COPY package.json 再 COPY 源码</b>。</li>
+      <li>提 .dockerignore，避免把 node_modules 打进镜像。</li>
+      <li>现场 build 两次，第二次明显更快（缓存命中）——这个 demo 很有说服力。</li>
+      <li>过渡：单个容器够用，但想造镜像还有几个坑要避，先看构建上下文。</li>
+    </ul>`,
+    // NEW 构建上下文
+    `<b>深入：构建上下文</b><ul>
+      <li>纠正常见误区：末尾的 <b>.</b> 不是 Dockerfile 目录，而是构建上下文，Dockerfile 由 -f 单独指定。</li>
+      <li>讲客户端/引擎模型：整个上下文打包上传，COPY 的源路径相对上下文，目标路径相对容器内工作目录。</li>
+      <li>解释为什么 <b>COPY ../a</b> 和绝对路径一定失败，以及 .dockerignore 减小上传体积的作用。</li>
+      <li>过渡：上下文清楚了，看怎么让镜像更瘦。</li>
+    </ul>`,
+    // NEW 多阶段构建
+    `<b>进阶：多阶段构建</b><ul>
+      <li>点出痛点：编译镜像里留着源码和 build-essential 纯属浪费体积。</li>
+      <li>逐行讲：第一阶段 AS builder 负责编译，第二阶段只 COPY --from=builder 拿成品。</li>
+      <li><b>全场最有冲击力的数字放这里</b>：常规镜像带源码+编译工具通常数百 MB，而 scratch + -static 最终镜像只有 <b>2.25 MB</b>——报数字时停顿一下。</li>
+      <li>强调 --from 后的路径是<b>镜像内路径</b>，不是宿主机路径。</li>
+      <li>过渡：镜像瘦身了，再解决数据留存问题。</li>
+    </ul>`,
+    // NEW 数据卷
+    `<b>进阶：数据持久化</b><ul>
+      <li>回扣前面的"容器易失"：容器存储层随容器消亡，必须把数据挪出去。</li>
+      <li>讲数据卷 4 个特性，现场敲 volume create + --mount，再用 inspect 看 Mounts 验证。</li>
+      <li>对比绑定宿主目录：绝对路径、可选 readonly，适合挂配置文件。</li>
+      <li>过渡：单容器和多容器都讲完了，看怎么编排一整组服务。</li>
+    </ul>`,
+    // 9 Compose
+    `<b>演示：Compose</b><ul>
+      <li>讲 web + db 的依赖关系；depends_on 只保证启动顺序、不保证就绪（进阶补充，可略过）。</li>
+      <li>现场 docker compose up -d，再用 docker compose ps 看状态。</li>
+      <li><b>第一道坎收尾</b>：环境一致性问题已被解决——镜像就是可版本化的运行环境。</li>
+      <li>过渡：进入第二道坎，Python 开发最痛的点——依赖管理。</li>
+    </ul>`,
+    // 10 uv 分隔页
+    `<b>过渡 · 第二道坎</b><ul>
+      <li>回扣主线：<b>环境固好了，但依赖还是一坨乱麻</b>——装包慢、虚拟环境多、工具一堆。</li>
+      <li>可以先吐槽一句 pip 慢、版本冲突，"我明明锁了版本怎么又装不上"。</li>
+    </ul>`,
+    // 11 uv 是什么
+    `<b>是什么</b><ul>
+      <li>点出 Astral 团队（Ruff 的作者）用 Rust 写的，增加可信度。</li>
+      <li>速度数字说"因项目和环境而异"，<b>别把 10-100x 当精确 benchmark</b>。</li>
+      <li>讲全局缓存：同一个包多个项目只下一份，这是日常最直接的收益。</li>
+      <li>过渡：它和老工具到底差在哪？</li>
+    </ul>`,
+    // 12 对比
+    `<b>对比</b><ul>
+      <li>逐行过表格，重点讲"内置管理 Python 版本"和"单二进制安装"这两个老工具做不到的。</li>
+      <li>口吻：不是踩老工具，而是场景不同；老项目迁移要评估成本。</li>
+      <li>过渡：看一遍真实工作流。</li>
+    </ul>`,
+    // 13 uv 命令
+    `<b>演示：工作流</b><ul>
+      <li>强烈建议现场从头走一遍 uv init → uv add → uv run，<b>全程 1 分钟</b>。</li>
+      <li>强调不用手动 source activate，<b>uv run 自动找到环境</b>——体验提升最大的点。</li>
+      <li>uv.lock 类比 npm 的 package-lock，保证可复现。</li>
+      <li>过渡：项目配置文件长什么样？</li>
+    </ul>`,
+    // 14 pyproject
+    `<b>项目文件</b><ul>
+      <li>说明 uv 拥抱标准 pyproject.toml，不造私有格式，这是它聪明的地方。</li>
+      <li>uv pip compile / sync 是给老项目平滑迁移用的，不必改现有流程。</li>
+      <li><b>第二道坎收尾</b>：依赖被锁定成 uv.lock，环境复现只差一条命令。</li>
+      <li>过渡：环境与依赖都解决了，看最后一道坎——让 AI 连接真实世界。</li>
+    </ul>`,
+    // 15 MCP 分隔页
+    `<b>过渡 · 第三道坎</b><ul>
+      <li>回扣主线：<b>前两道坎让应用"能跑"，第三道坎让 AI"能干活"</b>——够到本地文件、数据库和实时数据。</li>
+      <li>可以问："谁用过 AI 写代码但觉得它够不到本地文件/数据库？"</li>
+      <li>这部分是今天<b>最有增量的内容</b>，多花点时间，重点讲 Function Calling 关系和传输演进两页。</li>
+    </ul>`,
+    // 16 什么是 MCP
+    `<b>是什么</b><ul>
+      <li>把 USB-C 类比讲透：统一接口后，设备不必为每个宿主做适配。</li>
+      <li>点出 Anthropic 2024 年开源，现在是开放标准，多家厂商支持。</li>
+      <li>举例：让 AI 读本地文件、查数据库、提 GitHub PR。</li>
+      <li>过渡：那到底谁跟谁通信？</li>
+    </ul>`,
+    // 17 架构
+    `<b>架构</b><ul>
+      <li>沿图讲 Host → Client → Server 链路，强调 Client 与 Server 是 1:1 连接。</li>
+      <li>Tools / Resources / Prompts 各举一个具体例子，不要只念名字。</li>
+      <li>传输：本地用 stdio，远程用 <b>Streamable HTTP</b>（HTTP+SSE 已废弃），底层是 JSON-RPC 2.0。这里只点一句，下页展开。</li>
+      <li>过渡：架构清楚了，先回答一个最容易被问到的关系问题。</li>
+    </ul>`,
+    // NEW Function Calling vs MCP
+    `<b>深入：Function Calling vs MCP</b><ul>
+      <li><b>这是全场的差异化亮点</b>，别跳过——很多人把这俩混为一谈。</li>
+      <li>一句话区分：Function Calling 是模型能力（会提出调用），MCP 是协议标准（工具能被统一接进来）。</li>
+      <li>展开 Function Calling 的两层：模型层学会"何时调"，API 层用 tools 字段传函数描述；它本身不负责执行。</li>
+      <li>过渡：关系清楚了，再看传输方式这些年怎么演进的。</li>
+    </ul>`,
+    // NEW 传输方式演进
+    `<b>深入：传输方式演进</b><ul>
+      <li>按 stdio → HTTP+SSE → Streamable HTTP 的顺序讲，强调<b>演进原因</b>而不是背结论。</li>
+      <li>为什么当初选 SSE：工具列表会变，服务端需要<b>主动通知</b>客户端，普通 HTTP 做不到。</li>
+      <li>为什么又被换掉：SSE 只能传文本、主要面向浏览器、要维护两个端点；Streamable HTTP 收敛为一个 URL，支持断线续传与会话管理。</li>
+      <li>提醒听众：网上很多老资料还写 HTTP/SSE，<b>那是已废弃的方案</b>。</li>
+      <li>过渡：理论够了，看怎么实际接一个现成能力。</li>
+    </ul>`,
+    // 18 配置 Server
+    `<b>演示：接入现成 Server</b><ul>
+      <li>展示配置文件，解释 command + args 是什么意思、npx -y 的作用。</li>
+      <li><b>安全提示要着重讲</b>：只授权必要目录，最小权限原则。</li>
+      <li>提醒：改完配置要<b>重启客户端</b>才生效，这是最常见踩坑点。</li>
+      <li>过渡：想做自己的工具怎么办？</li>
+    </ul>`,
+    // 19 手写 Server
+    `<b>演示：手写 Server</b><ul>
+      <li>现场最快路径：pip install mcp → 写十几行 → 配到客户端 → 让 AI 调用 add(2, 3)。</li>
+      <li>最省事的地方：<b>装饰器 + 类型注解 + docstring 自动生成工具描述</b>。</li>
+      <li>提醒函数名和 docstring 要写清楚，模型靠它们理解工具用途。</li>
+      <li>过渡：把三件套串起来收尾。</li>
+    </ul>`,
+    // 20 总结
+    `<b>收尾</b><ul>
+      <li><b>首尾呼应</b>：回到开场那"三道坎"——环境（Docker）→ 依赖（uv）→ 连接（MCP），三件工具刚好各跨一道。</li>
+      <li>一句话带走：<b>Docker 固环境、uv 管依赖、MCP 连世界</b>。</li>
+      <li>落地建议：明天工作里只挑一个点先试，别一次性全上。</li>
+      <li>开放 Q&amp;A，留出联系方式占位。</li>
+    </ul>`
+  ];
+
+  const total = slides.length;
+  totalEl.textContent = total;
+  coverTotal.textContent = total;
+
+  function render(){
+    slides.forEach((s,idx)=> s.classList.toggle('active', idx===i));
+    const s = slides[i];
+    const accent = getComputedStyle(s).getPropertyValue('--accent').trim() || '#2563eb';
+    progress.style.width = ((i+1)/total*100)+'%';
+    progress.style.background = accent;
+    chapterTag.textContent = s.dataset.label || '';
+    chapterTag.style.color = accent;
+    curEl.textContent = i+1;
+    prevBtn.disabled = (i===0);
+    nextBtn.disabled = (i===total-1);
+    notesBody.innerHTML = NOTES[i] || '<p>本页无备注。</p>';
+    notesPage.textContent = i+1;
+    if(presenterWin && !presenterWin.closed) renderPresenter();
+  }
+  function go(n){ i = Math.max(0, Math.min(total-1, n)); render(); }
+  function next(){ go(i+1); }
+  function prev(){ go(i-1); }
+
+  document.addEventListener('keydown', e=>{
+    if(['ArrowRight',' ','PageDown','Enter'].includes(e.key)){ e.preventDefault(); next(); }
+    else if(['ArrowLeft','PageUp'].includes(e.key)){ e.preventDefault(); prev(); }
+    else if(e.key==='n'||e.key==='N'){ toggleNotes(); }
+    else if(e.key==='p'||e.key==='P'){ openPresenter(); }
+    else if(e.key==='Home'){ e.preventDefault(); go(0); }
+    else if(e.key==='End'){ e.preventDefault(); go(total-1); }
+  });
+  nextBtn.addEventListener('click', next);
+  prevBtn.addEventListener('click', prev);
+  notesBtn.addEventListener('click', toggleNotes);
+  notesClose.addEventListener('click', toggleNotes);
+  presenterBtn.addEventListener('click', openPresenter);
+
+  function toggleNotes(){
+    const on = document.body.classList.toggle('show-notes');
+    notesBtn.classList.toggle('on', on);
+  }
+  function openPresenter(){
+    if(presenterWin && !presenterWin.closed){ presenterWin.focus(); return; }
+    presenterWin = window.open('', 'techsalon-presenter', 'width=820,height=680');
+    if(!presenterWin){ alert('浏览器拦截了弹出窗口，请允许弹窗后按 P 重试。'); return; }
+    presenterWin.document.write(
+      '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>演讲者视图</title><style>'+
+      'body{margin:0;padding:26px 30px;background:#0f172a;color:#e2e8f0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}'+
+      'h1{font-size:.82rem;letter-spacing:.12em;text-transform:uppercase;color:#64748b;margin:0}'+
+      '#timer{font-size:2.4rem;font-weight:800;color:#38bdf8;font-variant-numeric:tabular-nums;margin:.15em 0 1em}'+
+      '#now{font-size:1.35rem;font-weight:800;color:#fff;margin-bottom:.6em}'+
+      '#notes{font-size:1.05rem;line-height:1.75;color:#cbd5e1}'+
+      '#notes ul{margin:.5em 0 0 1.1em}#notes li{margin:.45em 0}#notes b{color:#f8fafc}'+
+      '.next{margin-top:26px;padding-top:16px;border-top:1px solid #334155;font-size:.95rem;color:#94a3b8}'+
+      '.next b{color:#e2e8f0}.hint{margin-top:18px;font-size:.78rem;color:#475569}'+
+      '</style></head><body><h1>演讲者视图 · 在主窗口用 ← → 翻页</h1>'+
+      '<div id="timer">00:00</div><div id="now"></div><div id="notes"></div>'+
+      '<div class="next" id="nextSlide"></div>'+
+      '<div class="hint">把本窗口拖到你的笔记本屏幕，主窗口投屏给观众。</div></body></html>'
+    );
+    presenterWin.document.close();
+    renderPresenter();
+  }
+  function renderPresenter(){
+    if(!presenterWin || presenterWin.closed) return;
+    const d = presenterWin.document;
+    const s = slides[i];
+    d.getElementById('now').textContent = '第 '+ (i+1) +' / '+ total +' 页 · '+ (s.dataset.label||'');
+    d.getElementById('notes').innerHTML = NOTES[i] || '<p>本页无备注。</p>';
+    const nx = slides[i+1];
+    d.getElementById('nextSlide').innerHTML = nx
+      ? '下一页：<b>'+ (nx.dataset.label||'') +' — '+ ((nx.querySelector('h1,h2')||{}).textContent||'').trim() +'</b>'
+      : '下一页：<b>已是最后一页</b>';
+  }
+  const startedAt = Date.now();
+  setInterval(function(){
+    if(presenterWin && !presenterWin.closed){
+      const el = presenterWin.document.getElementById('timer');
+      if(el){
+        const t = Math.floor((Date.now()-startedAt)/1000);
+        el.textContent = String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
+      }
+    }
+  }, 1000);
+
+  document.querySelectorAll('[data-goto]').forEach(el=>{
+    el.addEventListener('click', ()=> go(parseInt(el.dataset.goto,10)-1));
+  });
+
+  // touch swipe
+  let sx=null;
+  document.addEventListener('touchstart', e=> sx=e.touches[0].clientX, {passive:true});
+  document.addEventListener('touchend', e=>{
+    if(sx===null) return;
+    const dx = e.changedTouches[0].clientX - sx;
+    if(Math.abs(dx)>50){ dx<0 ? next() : prev(); }
+    sx=null;
+  }, {passive:true});
+
+  render();
+})();
+</script>
+</body>
+</html>
